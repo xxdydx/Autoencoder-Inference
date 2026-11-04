@@ -8,7 +8,7 @@ I optimised a transformer autoencoder for time-series scoring: 720 observations,
 layouts, GPU compilation and transfer overlap, and custom Triton feed-forward
 kernels.
 
-The selected custom path averaged **248.46ms** per burst, compared with **290ms** for [TensorRT]((https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/optimization.html)) at batch size 32 in this study. Comparing against it provided a useful reference for whether the workload-specific custom kernels could improve on an automatically optimised deployment.
+The selected custom path averaged **248.46ms** per burst, compared with **290ms** for [TensorRT]((https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/optimization.html)) at batch size 32 and 302ms for batch size 64 in this study. Comparing against it provided a useful reference for whether the workload-specific custom kernels could improve on an automatically optimised deployment.
 
 ## Published results
 
@@ -62,6 +62,27 @@ TensorRT for its backend. Run their modules from the repository root, for exampl
 `python -m gpu.gpu_suite`. They expect the same checkpoint, generated validation
 inputs, and CPU reference scores. The CPU requirements files do not install the
 GPU stack.
+
+For the profiler follow-up, `gpu/profile_ffn.py` captures the eager, compiled,
+and fixed-configuration fused FFN after warmup. `gpu/profile_pipeline.py` adds
+NVTX ranges around CPU packing, H2D copies, and inference in the existing
+pipeline. Setup and five full-cycle warmups stay outside the Systems capture.
+The collection driver runs captures and uninstrumented timing studies
+sequentially:
+
+```sh
+python -m gpu.collect_profiles --nsys /path/to/nsys --ncu /path/to/ncu
+python -m gpu.analyze_profiles
+```
+
+These commands require the saved checkpoint and validation inputs, the CUDA
+stack, and recent Nsight tools supporting the GPU. Analysis also requires NumPy
+and Matplotlib. Raw captures and command logs go to `artifacts/profiler/`;
+measured SVG/PNG figures, per-kernel CSV, and summary JSON go to
+`reports/profiler_evidence/`. GPU counter access must be enabled by the host for
+Nsight Compute. The driver records counter-access failures; Systems timelines
+and compiler resource metadata do not establish physical DRAM traffic or
+achieved occupancy.
 
 ## Repository scope
 

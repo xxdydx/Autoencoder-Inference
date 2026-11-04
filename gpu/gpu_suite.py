@@ -145,7 +145,7 @@ class GraphScore:
     def __call__(self,data):
         x,y,graph=self.entries[len(data)];x.copy_(data);graph.replay();return y
 
-def pipeline(kind,batch,mode,devices,cycles,profile=False):
+def pipeline(kind,batch,mode,devices,cycles,profile=False,*,warmup_cycles=0,capture_range=False,annotate=False):
     """Real rings, CPU normalization, H2D, scoring, D2H and JSON in the timer.
 
     pageable_sync: every batch transfers and returns scores synchronously.
@@ -182,6 +182,8 @@ def pipeline(kind,batch,mode,devices,cycles,profile=False):
             assert torch.allclose(actual,expected,rtol=1e-4,atol=1e-5),'Captured scorer differs from eager'
     torch.cuda.synchronize();setup_s=time.perf_counter()-setup
     samples=[];first_scores=None
+    def region(name):
+        return torch.cuda.nvtx.range(name) if annotate else contextlib.nullcontext()
     def cycle(index):
         nonlocal first_scores
         head=(137+index)%720;before=snapshot();torch.cuda.synchronize();start=time.perf_counter();prep=0.;gpu_events=[]
@@ -193,19 +195,22 @@ def pipeline(kind,batch,mode,devices,cycles,profile=False):
             else:
                 if done[j] is not None:done[j].synchronize()
                 t=time.perf_counter();buf=host_arrays[j][:n]
-                np.copyto(buf[:,:720-head],ring[left:left+n,head:]);np.copyto(buf[:,720-head:],ring[left:left+n,:head])
-                if mode!='gpu_normalize':np.multiply(buf,scale,out=buf);np.add(buf,offset,out=buf)
+                with region(f'pack_batch_{chunk}'):
+                    np.copyto(buf[:,:720-head],ring[left:left+n,head:]);np.copyto(buf[:,720-head:],ring[left:left+n,:head])
+                    if mode!='gpu_normalize':np.multiply(buf,scale,out=buf);np.add(buf,offset,out=buf)
                 prep+=time.perf_counter()-t
                 if mode in ('pinned_overlap','gpu_normalize'):
-                    with torch.cuda.stream(copy_stream):
+                    with region(f'h2d_batch_{chunk}'),torch.cuda.stream(copy_stream):
                         device[j][:n].copy_(host[j][:n],non_blocking=True)
                         copied=torch.cuda.Event();copied.record()
                     torch.cuda.current_stream().wait_event(copied)
-                else:device[j][:n].copy_(host[j][:n],non_blocking=pinned)
+                else:
+                    with region(f'h2d_batch_{chunk}'):device[j][:n].copy_(host[j][:n],non_blocking=pinned)
                 data=device[j][:n]
                 if mode=='gpu_normalize':data.mul_(gs).add_(go)
             e0=torch.cuda.Event(enable_timing=True);e1=torch.cuda.Event(enable_timing=True)
-            e0.record();output=s(data);scores[left:left+n].copy_(output);e1.record();gpu_events.append((e0,e1))
+            with region(f'compute_batch_{chunk}'):
+                e0.record();output=s(data);scores[left:left+n].copy_(output);e1.record();gpu_events.append((e0,e1))
             done[j]=e1
             if mode=='pageable_sync':scores[left:left+n].cpu()
         out=scores.cpu().numpy()
@@ -217,11 +222,21 @@ def pipeline(kind,batch,mode,devices,cycles,profile=False):
                     local_json_s=time.perf_counter()-inference_end,batch_cuda_ms=[a.elapsed_time(b) for a,b in gpu_events],
                     resource_before=before,resource_after=snapshot(),payload_bytes=len(payload),head=head)
     torch.cuda.reset_peak_memory_stats()
+    for i in range(warmup_cycles):cycle(-i-1)
     for i in range(cycles):
-        row=cycle(i);samples.append(row)
+        if capture_range and i==0:torch.cuda.profiler.start()
+        try:
+            with region(f'cycle_{i}_{kind}_{mode}_b{batch}'):row=cycle(i)
+        finally:
+            if capture_range and i==0:
+                torch.cuda.synchronize();torch.cuda.profiler.stop()
+        samples.append(row)
         record=dict(kind=kind,batch=batch,mode=mode,devices=devices,cycles=samples,setup_warmup_s=setup_s,
                     latency_s=distribution([v['wall_s'] for v in samples]),windows_per_second=devices/np.mean([v['wall_s'] for v in samples]),
                     peak_allocated_bytes=torch.cuda.max_memory_allocated(),peak_reserved_bytes=torch.cuda.max_memory_reserved(),gpu=gpu_state())
+        if warmup_cycles or capture_range or annotate:
+            record['profiling_protocol']=dict(full_cycle_warmups=warmup_cycles,capture_range=capture_range,nvtx=annotate,
+                                               scorer_warmups_per_shape=3,slot_warmups=slots)
         if first_scores is not None:
             np.save(A/(name+'_scores_head137.npy'),first_scores)
             if devices==3000:

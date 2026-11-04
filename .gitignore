@@ -51,6 +51,10 @@
 !/gpu/gpu_followup.py
 !/gpu/gpu_suite.py
 !/gpu/kernel_metadata.py
+!/gpu/profile_ffn.py
+!/gpu/profile_pipeline.py
+!/gpu/collect_profiles.py
+!/gpu/analyze_profiles.py
 !/gpu/onnxruntime_backend.py
 !/gpu/pair_fusion.py
 !/gpu/run_full_ffn.py
