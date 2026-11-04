@@ -1,63 +1,70 @@
-# Public companion to the blog: include only the source files listed below.
-# Everything else stays local, including reports, figures, plots, checkpoints,
-# traces, raw measurements, archives, environments, logs and operational scripts.
-# Add new public source files explicitly rather than publishing generated output.
+# Public companion to the blog. Everything is local unless listed below.
+# This excludes reports, figures, plots, checkpoints, traces, archives,
+# environments, logs, operational scripts and historical report generators.
+# Add new public source files explicitly.
 /*
 
-# Repository documentation and dependencies.
 !/.gitignore
 !/README.md
-!/requirements.txt
-!/requirements-base.txt
-!/requirements-modern.txt
 
-# Model, training, export and numerical validation.
-!/model.py
-!/train.py
-!/export.py
-!/validate.py
-!/cross_version.py
-!/deep_models.py
+# autoencoder
+!/autoencoder/
+/autoencoder/*
+!/autoencoder/__init__.py
+!/autoencoder/cross_version.py
+!/autoencoder/deep_models.py
+!/autoencoder/environment.py
+!/autoencoder/export.py
+!/autoencoder/measurement.py
+!/autoencoder/model.py
+!/autoencoder/runtime_setup.py
+!/autoencoder/train.py
+!/autoencoder/validate.py
 
-# CPU benchmarking, input storage and resource measurement.
-!/benchmark.py
-!/paired.py
-!/pipeline.py
-!/pipeline_deep.py
-!/preprocessing.py
-!/measurement.py
-!/runtime_setup.py
-!/environment.py
-!/deep_attention.py
-!/deep_memory.py
-!/deep_model_controls.py
-!/deep_quota.py
-!/native_path_study.py
+# cpu
+!/cpu/
+/cpu/*
+!/cpu/__init__.py
+!/cpu/benchmark.py
+!/cpu/deep_attention.py
+!/cpu/deep_memory.py
+!/cpu/deep_model_controls.py
+!/cpu/deep_quota.py
+!/cpu/native_path_study.py
+!/cpu/paired.py
+!/cpu/pipeline.py
+!/cpu/pipeline_deep.py
+!/cpu/preprocessing.py
+!/cpu/run_allocator.py
+!/cpu/run_deep.py
+!/cpu/run_full_allocator.py
+!/cpu/run_native_alloc_controls.py
+!/cpu/run_native_path.py
+!/cpu/run_remote.py
 
-# CPU experiment drivers. Remote setup and report generators remain local.
-!/run_remote.py
-!/run_deep.py
-!/run_allocator.py
-!/run_full_allocator.py
-!/run_native_path.py
-!/run_native_alloc_controls.py
+# gpu
+!/gpu/
+/gpu/*
+!/gpu/__init__.py
+!/gpu/fused_ffn.py
+!/gpu/fusion_case.py
+!/gpu/gpu_followup.py
+!/gpu/gpu_suite.py
+!/gpu/kernel_metadata.py
+!/gpu/onnxruntime_backend.py
+!/gpu/pair_fusion.py
+!/gpu/run_full_ffn.py
+!/gpu/run_fusion.py
+!/gpu/run_tensorrt.py
+!/gpu/tensorrt_backend.py
+!/gpu/tensorrt_case.py
 
-# GPU experiments: keep the benchmark harnesses and custom kernels only.
-!/gpu_experiments/
-/gpu_experiments/*
-!/gpu_experiments/gpu_suite.py
-!/gpu_experiments/gpu_followup.py
-!/gpu_experiments/fused_ffn.py
-!/gpu_experiments/fusion_case.py
-!/gpu_experiments/run_fusion.py
-!/gpu_experiments/run_full_ffn.py
-!/gpu_experiments/pair_fusion.py
-!/gpu_experiments/kernel_metadata.py
-!/gpu_experiments/tensorrt_backend.py
-!/gpu_experiments/tensorrt_case.py
-!/gpu_experiments/run_tensorrt.py
-# Shared support for the optional backend in tensorrt_case.py.
-!/gpu_experiments/onnxruntime_backend.py
+# requirements
+!/requirements/
+/requirements/*
+!/requirements/requirements-base.txt
+!/requirements/requirements-modern.txt
+!/requirements/requirements.txt
 
 # Keep figures out even if another directory is made public later.
 *.png

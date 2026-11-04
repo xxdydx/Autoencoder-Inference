@@ -1,18 +1,18 @@
 # Optimising Transformer Autoencoder Inference
 
 Code accompanying [Optimising Inference for Transformer Autoencoders](https://blog.arul.me/posts/optimising-autoencoder-inference).
-The article is the source of truth for the results reported here.
 
-An inference engineering study of a transformer autoencoder for time-series
-scoring: 720 observations, 32 features, and bursts of 3,000 windows. The work
-explores circular input storage, CPU attention backends and worker layouts,
-GPU compilation and transfer overlap, and custom Triton feed-forward kernels.
+I optimised a transformer autoencoder for time-series scoring: 720 observations,
+32 features, and bursts of 3,000 windows. The goal was to score each burst within
+2 seconds. I explored circular input storage, CPU attention backends and worker
+layouts, GPU compilation and transfer overlap, and custom Triton feed-forward
+kernels.
+
+The selected custom path averaged **248.46ms** per burst, compared with **290ms** for [TensorRT]((https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/optimization.html)) at batch size 32 in this study. Comparing against it provided a useful reference for whether the workload-specific custom kernels could improve on an automatically optimised deployment.
 
 ## Published results
 
-These figures come directly from the article and describe its tested hardware
-and configurations. The CPU experiments used 8 CPUs and 32GB RAM; the GPU was an
-RTX Pro 4000 Blackwell SFF with 24GB VRAM.
+The CPU experiments used 8 CPUs and 32GB RAM; the GPU was an RTX Pro 4000 Blackwell SFF with 24GB VRAM.
 
 | Experiment | Result reported in the article |
 | --- | --- |
@@ -26,47 +26,48 @@ RTX Pro 4000 Blackwell SFF with 24GB VRAM.
 The final randomised comparison used 15 cycles per candidate. The rounded GPU
 burst timings and the final comparison are separate experiments in the article.
 
-## Code guide
+## Repository layout
 
-- `model.py`, `deep_models.py`: autoencoder, scoring, and native-transformer controls.
-- `benchmark.py`, `paired.py`, `pipeline*.py`: isolated CPU measurements and complete scoring pipelines.
-- `deep_*.py`, `native_path_study.py`, `run_*.py`: attention, allocator, storage, worker, and CPU backend experiments.
-- `gpu_experiments/gpu_suite.py`, `gpu_followup.py`: GPU precision, compilation, batching, and transfer experiments.
-- `gpu_experiments/fused_ffn.py`, `fusion_case.py`, `run_fusion.py`, `run_full_ffn.py`, `pair_fusion.py`: Triton kernels and comparison drivers.
-- `gpu_experiments/tensorrt_backend.py`, `tensorrt_case.py`, `run_tensorrt.py`: TensorRT export, execution, and comparisons.
+```text
+autoencoder/   Model, training, export, validation, and shared utilities
+cpu/           CPU benchmarks, input storage, and experiment drivers
+gpu/           GPU benchmarks, Triton kernels, and backend comparisons
+requirements/  Pinned CPU dependency sets
+```
+
+Start with `autoencoder/model.py` for the architecture, `cpu/benchmark.py` for
+CPU inference, and `gpu/fused_ffn.py` for the custom kernels.
 
 ## CPU quick start
 
-From the repository root on Linux, with Python available as `python`:
+Run commands from the repository root on Linux, with Python available as `python`:
 
 ```sh
 python -m venv .venv
 . .venv/bin/activate
-python -m pip install -r requirements-base.txt
+python -m pip install -r requirements/requirements-base.txt
 mkdir -p artifacts reports
-python train.py
-python benchmark.py --backend manual
-python benchmark.py --backend sdpa
+python -m autoencoder.train
+python -m cpu.benchmark --backend manual
+python -m cpu.benchmark --backend sdpa
 ```
 
 This trains a synthetic-data checkpoint and runs isolated CPU benchmarks.
-For exports and numerical checks, run `python export.py`, then `python validate.py`.
+For exports and numerical checks, run `python -m autoencoder.export`, then `python -m autoencoder.validate`.
 The CPU suite drivers retain the original affinity and environment assumptions;
 review them before running a full sweep. Run benchmark drivers sequentially.
 
 The GPU harnesses require CUDA-enabled PyTorch, Triton for custom kernels, and
-TensorRT for its backend. They were staged alongside the root Python modules
-on the GPU host and expect the same checkpoint, generated validation inputs,
-and CPU reference scores. They are experiment harnesses requiring that setup;
-the CPU requirements files do not install the GPU stack.
+TensorRT for its backend. Run their modules from the repository root, for example
+`python -m gpu.gpu_suite`. They expect the same checkpoint, generated validation
+inputs, and CPU reference scores. The CPU requirements files do not install the
+GPU stack.
 
 ## Repository scope
 
 Only experiment source, dependency files, and this README are included.
 `.gitignore` keeps all figures, plots, generated reports, raw measurements,
-model artifacts, environments, archives, and remote orchestration files local.
-It also excludes the old report and plot generators, so their historical
-results are not published alongside the article's results.
+model artifacts, environments, archives, and remote orchestration files locally on my own disk.
 
 This is a learning project using synthetic data. Numerical agreement checks
-do not establish anomaly-detection quality or production readiness.
+do not establish anomaly-detection quality or production readiness. Data included in this repository are purely synthetic and do not represent any production-level data and merely for demonstration purposes.
