@@ -55,6 +55,13 @@
 !/gpu/profile_pipeline.py
 !/gpu/collect_profiles.py
 !/gpu/analyze_profiles.py
+!/gpu/optimization_kernels.py
+!/gpu/optimization_study.py
+!/gpu/run_optimizations.py
+!/gpu/trt_comparison.py
+!/gpu/run_trt_comparison.py
+!/gpu/confirm_trt_profiles.py
+!/gpu/attention_controls.py
 !/gpu/onnxruntime_backend.py
 !/gpu/pair_fusion.py
 !/gpu/run_full_ffn.py
